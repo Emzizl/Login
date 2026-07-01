@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auth System Pro</title>
+
+<style>
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial,sans-serif;
+}
+
+body{
+    background:linear-gradient(135deg,#1d2671,#c33764);
+    color:white;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:100vh;
+    transition:.3s;
+}
+
+body.dark{
+    background:linear-gradient(135deg,#000,#333);
+}
+
+.container{
+    width:360px;
+    background:rgba(255,255,255,.12);
+    backdrop-filter:blur(12px);
+    padding:25px;
+    border-radius:18px;
+    box-shadow:0 0 25px rgba(0,0,0,.3);
+}
+
+h2{
+    text-align:center;
+    margin-bottom:20px;
+}
+
+input,select{
+    width:100%;
+    padding:12px;
+    margin:8px 0;
+    border:none;
+    border-radius:10px;
+    outline:none;
+    font-size:15px;
+}
+
+body.dark input,
+body.dark select{
+    background:#222;
+    color:white;
+}
+
+button{
+    width:100%;
+    padding:12px;
+    margin-top:10px;
+    border:none;
+    border-radius:10px;
+    background:#00a2ff;
+    color:white;
+    cursor:pointer;
+    font-size:15px;
+    transition:.2s;
+}
+
+button:hover{
+    transform:scale(1.03);
+}
+
+.link{
+    text-align:center;
+    margin-top:15px;
+    color:#ddd;
+    cursor:pointer;
+}
+
+.msg{
+    text-align:center;
+    color:#00ff99;
+    margin-top:10px;
+    min-height:20px;
+}
+
+.hidden{
+    display:none;
+}
+
+.profile{
+    text-align:center;
+}
+
+.profile p{
+    margin:10px 0;
+}
+
+#cookie{
+    position:fixed;
+    bottom:0;
+    width:100%;
+    background:#222;
+    text-align:center;
+    padding:12px;
+}
+
+#cookie button{
+    width:auto;
+    padding:8px 18px;
+    margin-left:10px;
+}
+
+.passBox{
+    display:flex;
+    gap:5px;
+}
+
+.passBox input{
+    flex:1;
+}
+
+.passBox button{
+    width:55px;
+    margin:0;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container" id="app">
+
+<div id="login">
+
+<h2>Вход</h2>
+
+<input id="loginUser" placeholder="Логин">
+
+<div class="passBox">
+<input id="loginPass" type="password" placeholder="Пароль">
+<button onclick="togglePass('loginPass')">👁</button>
+</div>
+
+<button onclick="login()">Войти</button>
+
+<div class="link" onclick="toggle()">
+Регистрация
+</div>
+
+<div class="msg" id="loginMsg"></div>
+
+</div>
+
+<div id="register" class="hidden">
+
+<h2>Регистрация</h2>
+
+<input id="regUser" placeholder="Логин">
+
+<div class="passBox">
+<input id="regPass" type="password" placeholder="Пароль">
+<button onclick="togglePass('regPass')">👁</button>
+</div>
+
+<input id="regAge" type="number" placeholder="Возраст">
+
+<select id="regGender">
+<option value="">Пол</option>
+<option>Мужской</option>
+<option>Женский</option>
+</select>
+
+<button onclick="register()">
+Создать аккаунт
+</button>
+
+<div class="link" onclick="toggle()">
+Назад
+</div>
+
+<div class="msg" id="regMsg"></div>
+
+</div>
+
+</div>
+
+<div id="cookie">
+Этот сайт использует cookie
+<button onclick="acceptCookies()">OK</button>
+</div>
+
+<script>
+
+const app=document.getElementById("app");
+
+const loginBox=document.getElementById("login");
+const registerBox=document.getElementById("register");
+
+const loginUser=document.getElementById("loginUser");
+const loginPass=document.getElementById("loginPass");
+const loginMsg=document.getElementById("loginMsg");
+
+const regUser=document.getElementById("regUser");
+const regPass=document.getElementById("regPass");
+const regAge=document.getElementById("regAge");
+const regGender=document.getElementById("regGender");
+const regMsg=document.getElementById("regMsg");
+
+if(localStorage.theme=="dark")
+document.body.classList.add("dark");
+
+if(localStorage.cookies)
+document.getElementById("cookie").style.display="none";
+
+if(localStorage.currentUser){
+
+let data=JSON.parse(localStorage.getItem(localStorage.currentUser));
+
+showProfile(localStorage.currentUser,data);
+
+}
+
+function toggle(){
+    loginBox.classList.toggle("hidden");
+    registerBox.classList.toggle("hidden");
+    loginMsg.textContent="";
+    regMsg.textContent="";
+}
+
+function toggleTheme(){
+    document.body.classList.toggle("dark");
+    localStorage.theme=document.body.classList.contains("dark")?"dark":"light";
+}
+
+function togglePass(id){
+    let input=document.getElementById(id);
+    input.type=input.type==="password"?"text":"password";
+}
+
+function acceptCookies(){
+    localStorage.cookies="1";
+    document.getElementById("cookie").style.display="none";
+}
+
+async function hash(text){
+
+    const buffer=await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(text)
+    );
+
+    return Array.from(new Uint8Array(buffer))
+    .map(x=>x.toString(16).padStart(2,"0"))
+    .join("");
+
+}
+
+async function register(){
+
+    const user=regUser.value.trim();
+    const pass=regPass.value;
+    const age=Number(regAge.value);
+    const gender=regGender.value;
+
+    if(user.length<3){
+        regMsg.textContent="Логин минимум 3 символа";
+        return;
+    }
+
+    if(pass.length<6){
+        regMsg.textContent="Пароль минимум 6 символов";
+        return;
+    }
+
+    if(!age){
+        regMsg.textContent="Введите возраст";
+        return;
+    }
+
+    if(!gender){
+        regMsg.textContent="Выберите пол";
+        return;
+    }
+
+    if(localStorage.getItem(user)){
+        regMsg.textContent="Такой логин уже существует";
+        return;
+    }
+
+    const account={
+
+        password:await hash(pass),
+
+        age,
+
+        gender,
+
+        created:new Date().toLocaleString(),
+
+        lastLogin:"Первый вход",
+
+        visits:0
+
+    };
+
+    localStorage.setItem(user,JSON.stringify(account));
+
+    regMsg.textContent="Аккаунт создан ✔";
+
+    regUser.value="";
+    regPass.value="";
+    regAge.value="";
+    regGender.value="";
+
+    setTimeout(toggle,1000);
+
+}
+
+async function login(){
+
+    const user=loginUser.value.trim();
+    const pass=loginPass.value;
+
+    const saved=localStorage.getItem(user);
+
+    if(!saved){
+        loginMsg.textContent="Аккаунт не найден";
+        return;
+    }
+
+    const data=JSON.parse(saved);
+
+    if(data.password!==await hash(pass)){
+        loginMsg.textContent="Неверный пароль";
+        return;
+    }
+
+    data.visits++;
+    data.lastLogin=new Date().toLocaleString();
+
+    localStorage.setItem(user,JSON.stringify(data));
+
+    localStorage.currentUser=user;
+
+    showProfile(user,data);
+
+}function showProfile(user,data){
+
+app.innerHTML=`
+
+<div class="profile">
+
+<h2>👋 Добро пожаловать</h2>
+
+<h1>${user}</h1>
+
+<p><b>Возраст:</b> ${data.age}</p>
+
+<p><b>Пол:</b> ${data.gender}</p>
+
+<p><b>Дата регистрации:</b><br>${data.created}</p>
+
+<p><b>Последний вход:</b><br>${data.lastLogin}</p>
+
+<p><b>Количество входов:</b> ${data.visits}</p>
+
+<button onclick="logout()">
+🚪 Выйти
+</button>
+
+<button onclick="deleteAccount()">
+🗑 Удалить аккаунт
+</button>
+
+<button onclick="toggleTheme()">
+🌙 Сменить тему
+</button>
+
+</div>
+
+`;
+
+}
+
+function logout(){
+
+    localStorage.removeItem("currentUser");
+
+    location.reload();
+
+}
+
+function deleteAccount(){
+
+    if(!confirm("Удалить аккаунт?"))
+        return;
+
+    const user=localStorage.currentUser;
+
+    localStorage.removeItem(user);
+
+    localStorage.removeItem("currentUser");
+
+    location.reload();
+
+}
+
+</script>
+
+</body>
+</html>
